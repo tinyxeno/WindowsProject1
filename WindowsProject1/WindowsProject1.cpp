@@ -404,14 +404,14 @@ BOOL FindItem(HWND hWnd, int iSubItem);
 /// </summary>
 /// <param name="pValue">文字列</param>
 /// <returns>BSTR文字列</returns>
-BSTR    str2BSTR(LPCTSTR	pValue);
+BSTR    str2BSTR(LPCTSTR pValue);
 
 /// <summary>
 /// BSTR を文字列へ変換します。
 /// </summary>
 /// <param name="bstr">BSTR文字列</param>
 /// <returns>文字列</returns>
-LPCTSTR	BSTR2str(BSTR	bstr);
+LPCTSTR BSTR2str(BSTR bstr);
 
 /// <summary>
 /// COM オブジェクトを作成します。
@@ -419,7 +419,7 @@ LPCTSTR	BSTR2str(BSTR	bstr);
 /// <param name="ppDispatch">COMオブジェクト</param>
 /// <param name="pClassName">オブジェクト名</param>
 /// <returns>処理結果</returns>
-HRESULT	create_instance(IDispatch** ppDispatch, LPCTSTR		pClassName);
+HRESULT create_instance(IDispatch** ppDispatch, LPCTSTR pClassName);
 
 /// <summary>
 /// COMオブジェクトを操作します。
@@ -431,7 +431,7 @@ HRESULT	create_instance(IDispatch** ppDispatch, LPCTSTR		pClassName);
 /// <param name="pParam">【省略可】パラメータの配列</param>
 /// <param name="uParamCount">【省略可】パラメータの個数。省略時１個</param>
 /// <returns>処理結果</returns>
-HRESULT	com_invoke(
+HRESULT com_invoke(
     IDispatch   _In_*       source,
     LPCTSTR     _In_        pCommand,
     BOOL        _In_        bPut = TRUE,
@@ -4994,12 +4994,12 @@ BOOL FindItem(HWND source, int index)
 }
 
 
-BSTR	str2BSTR(LPCTSTR	source)
+BSTR str2BSTR(LPCTSTR source)
 {
-    BSTR	result = nullptr;
+    BSTR result = nullptr;
     if (nullptr != source)
     {
-#ifdef	_UNICODE
+#ifdef _UNICODE
         result = ::SysAllocString(source);
 #else
         size_t value = ::_tcsclen(source);
@@ -5011,19 +5011,19 @@ BSTR	str2BSTR(LPCTSTR	source)
         }
 #endif
     }
-    return	result;
+    return result;
 }
 
 
-LPCTSTR	BSTR2str(BSTR	source)
+LPCTSTR BSTR2str(BSTR source)
 {
-    LPTSTR	result = nullptr;
+    LPTSTR result = nullptr;
     if (nullptr != source)
     {
-#ifdef	_UNICODE
+#ifdef _UNICODE
         result = ::_tcsdup((LPCWSTR)source);
 #else
-        int	index = ::WideCharToMultiByte(CP_ACP, 0, (OLECHAR*)source, -1, nullptr, 0, nullptr, nullptr);
+        int index = ::WideCharToMultiByte(CP_ACP, 0, (OLECHAR*)source, -1, nullptr, 0, nullptr, nullptr);
         size_t value = (size_t)(index + 1);
         value *= sizeof(TCHAR);
         result = (LPTSTR)::malloc(value);
@@ -5037,19 +5037,19 @@ LPCTSTR	BSTR2str(BSTR	source)
     {
         result = ::_tcsdup(_T(""));
     }
-    return	(LPCTSTR)result;
+    return (LPCTSTR)result;
 }
 
 
-HRESULT	create_instance(IDispatch** ppDispatch, LPCTSTR	source)
+HRESULT create_instance(IDispatch** ppDispatch, LPCTSTR source)
 {
-    HRESULT	result = E_FAIL;
+    HRESULT result = E_FAIL;
     if (nullptr != source &&
         NULLSTR != *source &&
         nullptr != ppDispatch)
     {
-        CLSID	clsid;
-        BSTR	index = ::str2BSTR(source);
+        CLSID clsid;
+        BSTR index = ::str2BSTR(source);
         if (nullptr != index)
         {
             result = ::CLSIDFromProgID(index, &clsid);
@@ -5069,7 +5069,7 @@ HRESULT	create_instance(IDispatch** ppDispatch, LPCTSTR	source)
 }
 
 
-HRESULT	com_invoke(IDispatch _In_* source, LPCTSTR _In_ pCommand,
+HRESULT com_invoke(IDispatch _In_* source, LPCTSTR _In_ pCommand,
     BOOL _In_ bPut, VARIANT _Out_opt_* pResult,
     VARIANT _In_opt_* pParam, UINT _In_ uParamCount)
 {
@@ -5078,8 +5078,8 @@ HRESULT	com_invoke(IDispatch _In_* source, LPCTSTR _In_ pCommand,
         nullptr != pCommand &&
         NULLSTR != *pCommand)
     {
-        DISPID	dispID = 0;
-        BSTR	bstrValue = ::str2BSTR(pCommand);
+        DISPID dispID = 0;
+        BSTR bstrValue = ::str2BSTR(pCommand);
         if (nullptr != bstrValue)
         {
             result = source->GetIDsOfNames(IID_NULL, &bstrValue, 1, LOCALE_USER_DEFAULT, (DISPID*)&dispID);
@@ -5094,7 +5094,7 @@ HRESULT	com_invoke(IDispatch _In_* source, LPCTSTR _In_ pCommand,
             {
                 uFlag = DISPATCH_PROPERTYPUT;
             }
-            DISPPARAMS dispParams = { nullptr,	nullptr, 0,	0 };
+            DISPPARAMS dispParams = { nullptr, nullptr, 0, 0 };
             if (nullptr != pParam)
             {
                 dispParams.cArgs = uParamCount;
@@ -5107,7 +5107,7 @@ HRESULT	com_invoke(IDispatch _In_* source, LPCTSTR _In_ pCommand,
             }
             ::VariantInit(lResult);
             size_t value = sizeof(EXCEPINFO);
-            LPEXCEPINFO	pExcepInfo = (LPEXCEPINFO)::malloc(value);
+            LPEXCEPINFO pExcepInfo = (LPEXCEPINFO)::malloc(value);
             if (nullptr != pExcepInfo)
             {
                 ::SecureZeroMemory(pExcepInfo, value);
@@ -5120,7 +5120,7 @@ HRESULT	com_invoke(IDispatch _In_* source, LPCTSTR _In_ pCommand,
             }
         }
     }
-    return	result;
+    return result;
 }
 
 
