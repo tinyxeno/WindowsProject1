@@ -119,6 +119,11 @@ WNDPROC m_wndList;
 int     m_iItem, m_iSubItem;
 
 /// <summary>
+/// リスト・ビュー上のフローティング。エディタのサブクラスアドレスの保持先
+/// </summary>
+WNDPROC m_wndEdit;
+
+/// <summary>
 /// 検索・置換ダイアログのウィンドウハンドル
 /// </summary>
 HWND    m_hFindReplace;
@@ -276,6 +281,16 @@ LRESULT CALLBACK    ListProc(HWND, UINT, WPARAM, LPARAM);
 /// <param name="lParam3">ソートの緒元</param>
 /// <returns>大小を返す。等しい場合は0</returns>
 int     CALLBACK    SortList(LPARAM lParam1, LPARAM lParam2, LPARAM lParam3);
+
+/// <summary>
+/// フローティングエディタ処理
+/// </summary>
+/// <param name="">フローティングエディタのハンドル</param>
+/// <param name="">メッセージID</param>
+/// <param name="">パラメータ</param>
+/// <param name="">パラメータ</param>
+/// <returns></returns>
+LRESULT CALLBACK    EditProc(HWND, UINT, WPARAM, LPARAM);
 
 /// <summary>
 /// 文字列を指定文字列で分割し、配列へ変換して返す
@@ -1255,16 +1270,31 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
                     index = ::GetDlgItem(hWnd, AFX_IDW_PANE_FIRST);
                     if (::IsWindow(index))
                     {
+                        // リストビューのフローティングエディタのサブクラスを戻す
+                        WNDPROC source = ::m_wndEdit;
+                        if (nullptr != source)
+                        {
+                            HWND value = (HWND)::SendMessage(index, LVM_GETEDITCONTROL, 0, 0);
+                            if (::IsWindow(value))
+                            {
+#ifdef _M_IX86
+                                ::SetWindowLong(value, GWL_WNDPROC, (LONG)(LONGLONG)source);
+#else
+                                ::SetWindowLongPtr(value, GWLP_WNDPROC, (LONG_PTR)source);
+#endif
+                            }
+                            ::m_wndEdit = nullptr;
+                        }
                         // リストビューのサブクラスを戻す
-                        WNDPROC source = ::m_wndList;
-                        if (0 != source)
+                        source = ::m_wndList;
+                        if (nullptr != source)
                         {
 #ifdef _M_IX86
                             ::SetWindowLong(index, GWL_WNDPROC, (LONG)(LONGLONG)source);
 #else
                             ::SetWindowLongPtr(index, GWLP_WNDPROC, (LONG_PTR)source);
 #endif
-                            ::m_wndList = 0;
+                            ::m_wndList = nullptr;
                         }
                         HIMAGELIST result = nullptr;
                         UINT value = ::GetWindowLong(index, GWL_STYLE);
@@ -1272,8 +1302,7 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
                         {
                         case LVS_SHAREIMAGELISTS:
                             // リストビューのイメージリスト（大）を破棄
-                            result = (HIMAGELIST)::SendMessage(
-                                index, LVM_GETIMAGELIST, LVSIL_NORMAL, 0);
+                            result = (HIMAGELIST)::SendMessage(index, LVM_GETIMAGELIST, LVSIL_NORMAL, 0);
                             if (nullptr != result &&
                                 INVALID_HANDLE_VALUE != result)
                             {
@@ -3301,12 +3330,10 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
                             // 詳細リストビュー上のカラムのクリック処理
                             if (TRUE)
                             {
-                                LPNMLISTVIEW pNMLV =
-                                    reinterpret_cast<LPNMLISTVIEW>(pNMHDR);
+                                LPNMLISTVIEW pNMLV = reinterpret_cast<LPNMLISTVIEW>(pNMHDR);
                                 // ソート用構造体の構築
                                 UINT value = sizeof(SORTLIST);
-                                LPSORTLIST pSortList = (LPSORTLIST)
-                                    ::malloc(value);
+                                LPSORTLIST pSortList = (LPSORTLIST)::malloc(value);
                                 if (nullptr != pSortList &&
                                     ::IsWindow(::m_hMainWnd))
                                 {
@@ -3432,32 +3459,47 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
                             break;
                         case LVN_BEGINLABELEDIT:
                             // リストビューで編集が開始された場合の処理
-                            if (TRUE)
+                            if (::IsWindow(pNMHDR->hwndFrom))
                             {
-                                NMLVDISPINFO* pDispInfo = reinterpret_cast<NMLVDISPINFO*>(pNMHDR);
-                                HWND hCtrl = pNMHDR->hwndFrom;
-                                if (::IsWindow(hCtrl))
+                                HWND source = (HWND)::SendMessage(pNMHDR->hwndFrom, LVM_GETEDITCONTROL, 0, 0);
+                                if (::IsWindow(source))
                                 {
-                                    HWND hEdit = (HWND)::SendMessage(hCtrl, LVM_GETEDITCONTROL, 0, 0);
-                                    if (::IsWindow(hEdit))
+                                    LPCTSTR value = ::DDX_ListViewItemText(pNMHDR->hwndFrom, ::m_iSubItem);
+                                    if (nullptr != value)
                                     {
-                                        LPCTSTR value = ::DDX_ListViewItemText(hCtrl, ::m_iSubItem);
-                                        if (nullptr != value)
-                                        {
-                                            ::SetWindowText(hEdit, value);
-                                            ::free((void*)value);
-                                            value = nullptr;
-                                        }
+                                        ::SetWindowText(source, value);
+                                        ::free((void*)value);
+                                        value = nullptr;
                                     }
+                                    //リストビューのフローティングエディタのサブクラスを設定
+#ifdef _M_IX86
+                                    ::m_wndEdit = (WNDPROC)(LONGLONG)::SetWindowLong(source, GWL_WNDPROC, (LONG)(LONGLONG)::EditProc);
+#else
+                                    ::m_wndEdit = (WNDPROC)::SetWindowLongPtr(source, GWLP_WNDPROC, (LONG_PTR)::EditProc);
+#endif
                                 }
-                                ::MessageBox(IDP_AFXBARRES_TEXT_IS_REQUIRED, MB_ICONINFORMATION);
-                                ::InvalidateRect(hCtrl, nullptr, TRUE);
                             }
+                            ::MessageBox(IDP_AFXBARRES_TEXT_IS_REQUIRED, MB_ICONINFORMATION);
+                            ::InvalidateRect(pNMHDR->hwndFrom, nullptr, TRUE);
                             break;
                         case LVN_ENDLABELEDIT:
                             // リストビューで編集が終了した場合の処理
                             if (TRUE)
                             {
+                                WNDPROC source = ::m_wndEdit;
+                                if (nullptr != source)
+                                {
+                                    HWND value = (HWND)::SendMessage(pNMHDR->hwndFrom, LVM_GETEDITCONTROL, 0, 0);
+                                    if (::IsWindow(value))
+                                    {
+#ifdef _M_IX86
+                                        ::SetWindowLong(value, GWL_WNDPROC, (LONG)(LONGLONG)source);
+#else
+                                        ::SetWindowLongPtr(value, GWLP_WNDPROC, (LONG_PTR)source);
+#endif
+                                    }
+                                    ::m_wndEdit = nullptr;
+                                }
                                 NMLVDISPINFO* pDispInfo = reinterpret_cast<NMLVDISPINFO*>(pNMHDR);
                                 if (nullptr != pDispInfo &&
                                     nullptr != pDispInfo->item.pszText)
@@ -3467,7 +3509,7 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
                                         // 編集成功したので、
                                         // リストビューへ
                                         // エディットボックスの内容を書き戻す
-                                        ::DDX_ListViewItemText(hCtrl, ::m_iSubItem, pDispInfo->item.pszText);
+                                        ::DDX_ListViewItemText(pNMHDR->hwndFrom, ::m_iSubItem, pDispInfo->item.pszText);
                                         // 編集中状態の設定
                                         ::m_bDirty = TRUE;
                                         // 編集メッセージを表示
@@ -4306,6 +4348,21 @@ int CALLBACK SortList(LPARAM lParam1, LPARAM lParam2, LPARAM lParam3)
         }
     }
     return result;
+}
+
+
+LRESULT CALLBACK    EditProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
+{
+    switch (message)
+    {
+    case WM_COMMAND:
+        if (::IsWindow(::m_hMainWnd))
+        {
+            SendMessage(::m_hMainWnd, message, wParam, lParam);
+        }
+        break;
+    }
+    return ::CallWindowProc(::m_wndEdit, hWnd, message, wParam, lParam);
 }
 
 
